@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use PadWalker;
 
@@ -153,27 +153,29 @@ Object::Lexical - Syntactic Sugar for Easy Object Instance Data & More
 
 =head1 SYNOPSIS
 
-  package MyPackage;
-
-  use Object::Lexical; # 'nononlex', 'noexport', 'nowrap';
+  use Object::Lexical;
+  use Sub::Lexical;
 
   sub new {
 
     my $counter;
     our $this;
 
-    *inc = sub { $counter++ };
+    my sub inc { 
+       $counter++; 
+    }
 
-    *dec = sub { $counter-- };
+    my sub dec { 
+       $counter--;
+    } 
 
-    *inc3x = sub {
+    my sub inc3x {
       $this->inc() for(1..3); 
-    };
+    }
 
     instance();
 
-  }
-
+  } 
 
 =head1 ABSTRACT
 
@@ -238,6 +240,57 @@ modules into objects.
 
 =head2 ALTERNATE IDIOMS
 
+The "lite" approach: use built in Perl constructs to create normal closures. They
+may either be placed into the symbol table or stored in C<my> variables.
+These three alternate idioms remove the need to C<use Sub::Lexical>. L<Sub::Lexical> uses 
+souce filtering, which may clash with other source filters or 
+introduce bugs into code.
+
+  package MyPackage;
+
+  use Object::Lexical; 
+
+  sub new {
+
+    my $counter;
+    our $this;
+
+    *inc = sub { $counter++ };
+
+    *dec = sub { $counter-- };
+
+    *inc3x = sub {
+      $this->inc() for(1..3); 
+    };
+
+    instance();
+
+  }
+
+Rather than use globals, lexicals may be used:
+
+  package MyPackage;
+
+  use Object::Lexical; 
+
+  sub new {
+
+    my $counter;
+    our $this;
+
+    my $inc = sub { $counter++ };
+
+    my $dec = sub { $counter-- };
+
+    my $inc3x = sub {
+      $this->inc() for(1..3); 
+    };
+
+    instance();
+
+  }
+
+
 A C<method()> function is provided:
 
   use Object::Lexical;
@@ -260,39 +313,8 @@ A C<method()> function is provided:
 
   }
 
-This removes the need to C<use Sub::Lexical>. L<Sub::Lexical> uses 
-souce filtering, which may clash with other source filters or 
-introduce bugs into code.
-
-L<Sub::Lexical> seems like the perfect idiom:
-
-  use Object::Lexical;
-  use Sub::Lexical;
-
-  sub new {
-
-    my $counter;
-    our $this;
-
-    my sub inc { 
-       $counter++; 
-    }
-
-    my sub dec { 
-       $counter--;
-    } 
-
-    my sub inc3x {
-      $this->inc() for(1..3); 
-    }
-
-    instance();
-
-  } 
-
-But it doesn't seem to work with this module:
-"substr outside of string at /usr/local/lib/perl5/5.8.0/Text/Balanced.pm line 79."
-Perhaps this will be resolved in the future.
+This is logically the same thing as the previous example, using C<my> with
+closures.
 
 =head2 BUGS
 
@@ -308,6 +330,9 @@ objects that are only namespaces full of closures.
 Subs declared outside of the C<new()> block are annihilated in this version.
 Specifically, they are moved into the first object created, never replunished,
 as they aren't created run-time from inside the C<new()> block.
+Use the 'nononlex' option to C<use> to avoid this. You'll need to use one
+of the three lexical subs idioms: L<Sub::Lexical>, the C<method> statement,
+or C<my $subname = sub { }>, the plain old Perl closure syntax.
 
 Perl prototypes support magic that allows allows user defined functions
 follow the form of builtings C<grep { } @list> and C<map { } @list> to be created,
@@ -316,6 +341,7 @@ a strange syntax.
 
 Magic may not play nice with out modules that mangle the nametable or other
 trickery. Best to confine use to small container objects and the like for now.
+Unless you're brave.
 
 =head2 EXPORT
 
@@ -327,8 +353,6 @@ C<instance()> is always exported, and so is C<method()> - unless the
 =over 1
 
 =item http://perldesignpatterns.com/?AnonymousSubroutineObjects
-
-This module is really just part of this book.
 
 =item L<Class::Classless>
 
@@ -345,6 +369,10 @@ Ditto. Barrowed code from.
 ImplicitThis, an earlier attempt, wrapped methods to automatically read C<$this>,
 but it was error prone, and ignored the problem of accessing instance data.
 
+=item L<Sub::Lexical>
+
+Provides a syntax for lexically scoped subroutines. 
+
 =back
 
 =head1 AUTHOR
@@ -359,3 +387,28 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
 =cut
+
+# 
+# what if... methods were declared using some method 'foo' = sub { ... }; syntax
+# (method() being lvalue) at the top level, and a lexical references module or
+# B::Generate were used to minipulate, runtime, which lexicals each saw, so 
+# code references could be copy, configured, and populated into namespaces?
+#
+
+#
+# Lexical::Alias and PadWalker and AUTOLOAD together could do this:
+# use the old-style hash dispatch logic, but before dispatching, each lexical
+# in the PAD of the code reference would be aliased to a lexical stored in
+# the per object hash.
+#
+# ie, given a blessed hash, $foo = { }, $foo->{my_method} might reference $a and $b.
+# these would be aliased to $foo->{a} and $foo->{b} for that invocation
+#
+
+#
+# changes
+#
+
+# 0.1: initial version
+# 0.2: updated documentation to encourage use of Sub::Lexical, knocks docs around a bit.
+#      no code changes.
